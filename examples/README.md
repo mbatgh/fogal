@@ -13,7 +13,7 @@ obabel dps.sdf -Oc-dps.xyz --canonical
 xtb b973copt-dps.xyz --input mdxtb.inp --md --namespace dps > dps.out
 ```
 
-The resulting trajectory is then converted into individual xyz files, using openbable, or a simple awk script, to generate individual structure files in xyz format, as in:
+The resulting trajectory is then converted into individual xyz files, using openbabel, or a simple awk script, to generate individual structure files in xyz format, as in:
 
 ```
 awk '{if(NF==1) {na=$1; nc++; fn=sprintf("dps-%05d.xyz",nc);} print >> fn; }' dps.xtb.trj
