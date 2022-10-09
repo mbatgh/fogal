@@ -38,8 +38,9 @@ here in the scripts folder, and a number of external tools, including:
 - [acpype](https://github.com/alanwilter/acpype)
 - [LOOS](https://github.com/GrossfieldLab/loos)
 - [Ambertools](http://ambermd.org/AmberTools.php)
+- [xtb](https://github.com/grimme-lab/xtb)
 
-For more details see the documented [workflow](examples/dps.md) in the examples folder.
+For more details see the documented [workflow](examples/README.md) in the examples folder.
 
 A small, biased, selection of software that can be used for the calculations of training data
 (energies and forces for different conformers):
@@ -102,7 +103,7 @@ usage: fogal [command-line parameters]
 ```
 
 For more details on the generation of input files, their syntax, and the overall workflow, see the 
-example provided [here](examples/dps.md)
+example provided [here](examples/README.md)
 
 ## Reference
 
