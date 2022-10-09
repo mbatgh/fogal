@@ -5,12 +5,12 @@ The code provided here can be used to optimize Force field (FF) parameters for s
 by fitting them to reproduce energies and forces from ab-initio or DFT calculations.
 The resulting FF can be used in Molecular Dynamics simulations. If the input (initial parameters)
 are taken from GAFF, and the partial charges are generated accordingly (AM1BCC or RESP), we expect
-the resulting FF to be compatible with the Amber family of protrein/peptide FFs.
+the resulting FF to be compatible with the Amber family of protein/peptide FFs.
 The input  includes, for a given molecule: a topology file with initial values for all parameters, 
 a file with coordinates of a series of conformers, and a file that lists energies and/or forces 
 corresponding to each conformer. The output is another topology file with optimized force field 
 parameters, and a table comparing energies and forces obtained with the initial vs the optimized
-FF parameters. 
+FF parameters.
 
 ## Features
 
@@ -25,7 +25,7 @@ FF parameters.
 
 ## Prerequisites
 
-The program fogal is a plain C++ code that requires only standard libraries, and should compile
+The program fogal is a plain C code that requires only standard libraries, and should compile
 with gcc on most Linux distributions. Software for the generation of the training data (accurate
 energies and forces for the conformers) is not included here, but there are a good number of programs
 out there that can be used for this purpose, and some examples are listed below.
@@ -39,7 +39,7 @@ here in the scripts folder, and a number of external tools, including:
 - [LOOS](https://github.com/GrossfieldLab/loos)
 - [Ambertools](http://ambermd.org/AmberTools.php)
 
-For more details see the documented workflow in the examples folder.
+For more details see the documented [workflow](examples/dps.md) in the examples folder.
 
 A small, biased, selection of software that can be used for the calculations of training data
 (energies and forces for different conformers):
