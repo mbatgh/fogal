@@ -1,0 +1,15 @@
+; ap-dps_GMX.top created by acpype (v: 2021-02-05T22:15:50CET) on Tue Apr 27 00:53:21 2021
+
+[ defaults ]
+; nbfunc        comb-rule       gen-pairs       fudgeLJ fudgeQQ
+1               2               yes             0.5     0.8333
+
+; Include ap-dps_GMX.itp topology
+#include "ap-dps_GMX.itp"
+
+[ system ]
+ ap-dps
+
+[ molecules ]
+; Compound        nmols
+ ap-dps           1     

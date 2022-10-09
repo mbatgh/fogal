@@ -1,0 +1,8 @@
+initial_mutationrate          0.1
+mutationrate_genome           0.05
+mutationrate_population       0.5
+p_crossover                   0.5
+f_elite                       0.2
+f_lucky                       0.05
+n_mol                         1
+vdw_cutoff                    1.2     # cutoff radius used when calculating VdW interactions, in nm

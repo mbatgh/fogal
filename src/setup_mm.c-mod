@@ -1,0 +1,408 @@
+
+
+#include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+#include <unistd.h>
+#include "strucs.h"
+#include "functions.h"
+#include "vec.h"
+
+
+int setup_mm(const char* id, const t_parameters* pars, t_genotype* genome, t_topology* top, 
+             t_codonlimits* limits, double** coords, double* qme, double* w_qme, double* mme, double* mme0) {
+
+  int n_neigh;
+  int i,j,k;
+  int ii,jj,inb,nn,rnn;
+  int i1, i2, i3, i4,n_conf, n_mol, n_bond, n_ang, n_dih, n_imp, na;
+  int bbond, bangle, bpair;
+  int molnr1, molnr2;
+
+  double dx,dy,dz;
+  double r0,kb,r2,r1,debonds;
+  double dp,fc,dn,dedih;
+  double tmpc, tmpv;
+  double a0,ka,deangle;
+  double v1x,v1y,v1z,v2x,v2y,v2z,v3x,v3y,v3z,nv1,nv2,nv3,angle;
+  double invna,invnb,invnc,rAinv,rBinv,rCinv;
+  double cos_phi, sin_phi, phi;
+  double deimp;
+  double elfac, ljfac;
+  double br2, br, oor2, oor6, oor12, sig, eps, sig2, sig6, sig12;
+  double sum,avg,stv;
+  double ecoul,evdw,ebond,eimp,edih,eang;
+
+  static double oo4pe0 = 138.935458; /* = 1.0/(4.0*M_PI*eps0) in kJ/mol nm e^-2*/
+
+  double vb[3];
+  double v1[3];
+  double v2[3];
+  double r12[3];
+  double r23[3];
+  double r34[3];
+  double A[3];
+  double B[3];
+  double C[3];
+  double rij[3];
+
+  char dovdw[]="v";
+  char dobon[]="b";
+  char doang[]="a";
+  char dodih[]="d";
+  char doimp[]="i";
+
+  int** nbidx;
+  char filename[256];
+
+  FILE* fef;
+
+/* energies and forces due to couolomb and ALL interactions whose parameters do not change (do not get optimized)
+can be calculated once at the beginning ... then we only need to iterate for all cases where the grpidx is non zero ...
+*/
+
+
+  nbidx = i0mat(top->n_atoms*pars->n_mol,top->n_atoms*pars->n_mol);
+  na = pars->n_mol*top->n_atoms;
+  for(i=0;i< pars->n_qme+pars->n_qmf;i++) { mme0[i]=0.0; mme[i]=0.0;}
+
+/***** create top->nbidx[i][j] to associate the appropriate LJ parameters with each pair i,j *****/
+
+  for(i=0;i<top->n_atoms*pars->n_mol-1;i++) {
+    for(j=i+1;j<top->n_atoms*pars->n_mol;j++) {
+
+      ii=i; jj=j;
+      if(ii>=top->n_atoms) ii -= top->n_atoms;
+      if(jj>=top->n_atoms) jj -= top->n_atoms;
+      for(k=0;k<top->n_nb;k++) {
+        if((strcmp(top->nbat1[k],top->type[ii])==0 && strcmp(top->nbat2[k],top->type[jj])==0) ||
+           (strcmp(top->nbat2[k],top->type[ii])==0 && strcmp(top->nbat1[k],top->type[jj])==0))
+             nbidx[i][j]=k;
+      }
+    }
+  }
+
+/***** set up neighbour list *****/
+
+  top->n_neighbors = 0;
+
+  for(i=0;i<pars->n_mol*top->n_atoms-1;i++) {
+    for(j=i+1;j<pars->n_mol*top->n_atoms;j++) {
+
+      molnr1=(int)i/top->n_atoms;
+      molnr2=(int)j/top->n_atoms;
+
+      bbond=0;
+      bangle=0;
+      bpair=0;
+      
+      ii = i; while(ii>=top->n_atoms) ii -= top->n_atoms;
+      jj = j; while(jj>=top->n_atoms) jj -= top->n_atoms;
+
+      for(k=0;k<top->n_bonds;k++) {
+        if((top->ndex[ii]==top->bondi[k] && top->ndex[jj]==top->bondj[k] || top->ndex[ii]==top->bondj[k] && top->ndex[jj]==top->bondi[k]) && molnr1==molnr2) {
+           bbond=1;
+        }
+      }
+
+      for(k=0;k<top->n_angles;k++) {
+        if((top->ndex[ii]==top->anglei[k] && top->ndex[jj]==top->anglek[k] || 
+           top->ndex[ii]==top->anglek[k] && top->ndex[jj]==top->anglei[k]) && molnr1==molnr2) {
+           bangle=1;
+        }
+      }
+
+      for(k=0;k<top->n_pairs;k++) {
+        if((top->ndex[ii]==top->pairi[k] && top->ndex[jj]==top->pairj[k] || 
+           top->ndex[ii]==top->pairj[k] && top->ndex[jj]==top->pairi[k]) && molnr1==molnr2) {
+           bpair=1;
+        }
+      }
+
+      if(bbond==0 && bangle==0) {
+      
+        if((top->sgrpidx[nbidx[i][j]]!=0 || top->egrpidx[nbidx[i][j]]!=0) && (strstr(pars->opt,dovdw)!=NULL) ) {
+
+/***** set up neighbour list for nonbonded interctions with variable parameters *****/
+
+          if(bpair==1) {
+            top->nb_el_fac[top->n_neighbors]=0.8333;
+            top->nb_lj_fac[top->n_neighbors]=0.5;
+          } else {
+            top->nb_el_fac[top->n_neighbors]=1.0;
+            top->nb_lj_fac[top->n_neighbors]=1.0;
+          }
+
+          top->neighbor1[top->n_neighbors]=i;
+          top->neighbor2[top->n_neighbors]=j;
+          top->nbidx[top->n_neighbors]=nbidx[i][j];
+
+          top->n_neighbors++;
+          
+        } else {
+
+/***** calculate total energy/forces for constant non-bonded interactions *****/
+
+          if(bpair==1) {
+            elfac=0.8333;
+            ljfac=0.5;
+          } else {
+            elfac=1.0;
+            ljfac=1.0;
+          }
+          
+          for(n_conf=0;n_conf<pars->n_qme;n_conf++) { 
+
+            i1=i+n_conf*na;
+            i2=j+n_conf*na;
+            
+            dvec_sub(coords[i1],coords[i2],rij);
+            br2=dnorm2(rij);
+            br=sqrt(br2);
+            oor2=1.0/br2;
+            oor6=oor2*oor2*oor2;
+            oor12=oor6*oor6;        
+
+            inb=nbidx[i][j];
+            sig=top->sigma[inb];
+            eps=top->epsilon[inb];
+            sig2=sig*sig;
+            sig6=sig2*sig2*sig2;
+            sig12=sig6*sig6;
+
+            ii = i1; while(ii>=top->n_atoms) ii -= top->n_atoms;
+            jj = i2; while(jj>=top->n_atoms) jj -= top->n_atoms;
+
+            tmpc          = elfac*oo4pe0*top->charge[ii]*top->charge[jj]/br;
+            tmpv          = ljfac*4.0*eps*(sig12*oor12-sig6*oor6);
+            mme0[n_conf] += tmpc;
+            mme0[n_conf] += tmpv;
+          }
+        }
+      }
+    }
+  }
+
+/***** calculate total energy/forces for variable interactions *****/
+
+  for(n_conf=0;n_conf<pars->n_qme;n_conf++) {
+
+    evdw=0.0;
+    ecoul=0.0;
+    ebond=0.0;
+    eimp=0.0;
+    edih=0.0;
+    eang=0.0;
+
+/***** non-bonded *****/
+
+    for(nn=0;nn<top->n_neighbors;nn++) {
+
+      i1 = top->neighbor1[nn]+n_conf*top->n_atoms*pars->n_mol;
+      i2 = top->neighbor2[nn]+n_conf*top->n_atoms*pars->n_mol;
+      rnn=top->nbidx[nn];
+
+      sig=top->sigma[rnn];
+      eps=top->epsilon[rnn];
+      if(top->sgrpidx[rnn]!=0 && strstr(pars->opt,dovdw)!=NULL) sig = genome->codon[limits->codonidx[top->sgrpidx[rnn]]];
+      if(top->egrpidx[rnn]!=0 && strstr(pars->opt,dovdw)!=NULL) eps = genome->codon[limits->codonidx[top->egrpidx[rnn]]];
+      sig2=sig*sig;
+      sig6=sig2*sig2*sig2;
+      sig12=sig6*sig6;
+
+      dvec_sub(coords[i1],coords[i2],rij);
+      br2=dnorm2(rij);
+      br=sqrt(br2);
+      oor2=1.0/br2;
+      oor6=oor2*oor2*oor2;
+      oor12=oor6*oor6;
+
+      ii = i1; while(ii>=top->n_atoms) ii -= top->n_atoms;
+      jj = i2; while(jj>=top->n_atoms) jj -= top->n_atoms;
+
+      tmpc         = top->nb_el_fac[nn]*oo4pe0*top->charge[ii]*top->charge[jj]/br;
+      tmpv         = top->nb_lj_fac[nn]*4.0*eps*(sig12*oor12-sig6*oor6);
+
+      evdw+=tmpv;
+      ecoul+=tmpc;
+
+      mme[n_conf] += tmpc;
+      mme[n_conf] += tmpv;
+
+    }
+
+/***** bonds *****/
+
+    for(n_bond=0;n_bond<top->n_bonds;n_bond++) {
+      for(n_mol=0;n_mol<pars->n_mol;n_mol++) {
+
+        i1 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->bondi[n_bond] - 1;
+        i2 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->bondj[n_bond] - 1;
+        r0 = top->bondr[n_bond];
+        kb = top->bondk[n_bond];
+        if(top->bgrpidx[n_bond]!=0 && strstr(pars->opt,dobon)!=NULL) kb = genome->codon[limits->codonidx[top->bgrpidx[n_bond]]];
+
+        dvec_sub(coords[i1],coords[i2],vb);
+        r2=dnorm2(vb);
+        r1=sqrt(r2);
+
+        debonds = -kb*(r1-r0);
+
+        if(top->bgrpidx[n_bond]!=0 && strstr(pars->opt,dobon)!=NULL)
+          mme[n_conf] += 0.5*kb*(r1-r0)*(r1-r0);
+        else
+          mme0[n_conf] += 0.5*kb*(r1-r0)*(r1-r0);
+
+        ebond+=0.5*kb*(r1-r0)*(r1-r0);
+      }
+    }
+
+/***** angles *****/
+
+    for(n_ang=0;n_ang<top->n_angles;n_ang++) {
+      for(n_mol=0;n_mol<pars->n_mol;n_mol++) {
+
+        i1 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->anglei[n_ang] - 1;
+        i2 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->anglej[n_ang] - 1;
+        i3 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->anglek[n_ang] - 1;
+        a0 = top->angleeq[n_ang];
+        ka = top->anglefc[n_ang];
+        if(top->cgrpidx[n_ang]!=0 && strstr(pars->opt,doang)!=NULL) ka = genome->codon[limits->codonidx[top->cgrpidx[n_ang]]];
+        if(top->agrpidx[n_ang]!=0 && strstr(pars->opt,doang)!=NULL) a0 = genome->codon[limits->codonidx[top->agrpidx[n_ang]]];
+        a0=a0/180.0*M_PI;
+
+        dvec_sub(coords[i1],coords[i2],v1);
+        dvec_sub(coords[i3],coords[i2],v2);
+        angle = dvang(v1,v2);
+
+        deangle = -ka*(angle-a0);
+
+        if((top->cgrpidx[n_ang]!=0 && strstr(pars->opt,doang)!=NULL) || (top->agrpidx[n_ang]!=0 && strstr(pars->opt,doang)!=NULL)) 
+          mme[n_conf] += 0.5*ka*(angle-a0)*(angle-a0);
+        else 
+          mme0[n_conf] += 0.5*ka*(angle-a0)*(angle-a0);
+
+        eang+=0.5*ka*(angle-a0)*(angle-a0);
+      }
+    }
+
+/***** dihedrals *****/
+
+    for(n_dih=0;n_dih<top->n_dihedrals;n_dih++) {
+      for(n_mol=0;n_mol<pars->n_mol;n_mol++) {
+
+        i1 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->dihi[n_dih] - 1;
+        i2 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->dihj[n_dih] - 1;
+        i3 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->dihk[n_dih] - 1;
+        i4 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->dihl[n_dih] - 1;
+        dp=top->dihphase[n_dih]/180.0*M_PI;
+        fc=top->dihfc[n_dih];
+        dn=top->dihpn[n_dih];
+        if(top->dgrpidx[n_dih]!=0 && strstr(pars->opt,dodih)!=NULL) fc = genome->codon[limits->codonidx[top->dgrpidx[n_dih]]];
+
+        dvec_sub(coords[i1],coords[i2],r12);
+        dvec_sub(coords[i2],coords[i3],r23);
+        dvec_sub(coords[i3],coords[i4],r34);
+        dcprod(r12,r23,A);
+        rAinv = 1.0/dnorm(A);
+        dcprod(r23,r34,B);
+        rBinv = 1.0/dnorm(B);
+        dcprod(r23,A,C);
+        rCinv = 1.0/dnorm(C);
+
+        cos_phi = diprod(A,B)*(rAinv*rBinv);
+        sin_phi = diprod(C,B)*(rCinv,rBinv);
+        phi = -atan2(sin_phi,cos_phi);
+
+        dedih = -dn*fc*sin(dn*phi - dp);
+
+        if(top->dgrpidx[n_dih]!=0 && strstr(pars->opt,dodih)!=NULL)
+          mme[n_conf] += fc*(1.0+cos(dn*phi - dp));
+        else
+          mme0[n_conf] += fc*(1.0+cos(dn*phi - dp));
+
+        edih+=fc*(1.0+cos(dn*phi - dp));
+      }
+    }
+
+/***** impropers *****/
+
+    for(n_imp=0;n_imp<top->n_impropers;n_imp++) {
+      for(n_mol=0;n_mol<pars->n_mol;n_mol++) {
+
+        i1 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->impi[n_imp] - 1;
+        i2 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->impj[n_imp] - 1;
+        i3 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->impk[n_imp] - 1;
+        i4 = pars->n_mol*top->n_atoms*n_conf + n_mol*top->n_atoms + top->impl[n_imp] - 1;
+
+        dp=top->impphase[n_imp]/180.0*M_PI;
+        fc=top->impfc[n_imp];
+        dn=top->imppn[n_imp];
+        if(top->igrpidx[n_imp]!=0 && strstr(pars->opt,doimp)!=NULL) fc = genome->codon[limits->codonidx[top->igrpidx[n_imp]]];
+  
+        dvec_sub(coords[i1],coords[i2],r12);
+        dvec_sub(coords[i2],coords[i3],r23);
+        dvec_sub(coords[i3],coords[i4],r34);
+        
+        dcprod(r12,r23,A);
+        rAinv = 1.0/dnorm(A);
+        dcprod(r23,r34,B);
+        rBinv = 1.0/dnorm(B);
+        dcprod(r23,A,C);
+        rCinv = 1.0/dnorm(C);
+        cos_phi = diprod(A,B)*(rAinv*rBinv);
+        sin_phi = diprod(C,B)*(rCinv*rBinv);
+        phi = -atan2(sin_phi,cos_phi);
+
+        deimp = -dn*fc*sin(dn*phi - dp);
+        if(top->igrpidx[n_imp]!=0 && strstr(pars->opt,doimp)!=NULL)
+          mme[n_conf] += fc*(1.0+cos(dn*phi - dp));
+        else
+          mme0[n_conf] += fc*(1.0+cos(dn*phi - dp));
+
+        eimp+=fc*(1.0+cos(dn*phi - dp));
+      }
+    }
+
+  printf("# conf %d, e:%18.6lf%18.6lf%18.6lf%18.6lf%18.6lf%18.6lf\n", n_conf, ecoul,evdw,ebond,eang,edih,eimp);  
+  }
+
+/* scale mme and write qme vs mme to disk */
+
+
+  sum=0.0;
+  for(i=0;i<pars->n_qme;i++) sum+=mme0[i]+mme[i];
+  avg=sum/(double)pars->n_qme;
+  stv=0.0;
+  for(i=0;i<pars->n_qme;i++) stv+=(mme0[i]+mme[i]-avg)*(mme0[i]+mme[i]-avg);
+  stv=sqrt(stv/(double)pars->n_qme);
+
+  sprintf(filename, "ef-%s-init",id);
+  if((fef=fopen(filename,"w"))==NULL) error_msg("cannot open ef-init file");
+
+  for(i=0;i<pars->n_qme;i++) fprintf(fef,"%12d%14.6le%14.6le%14.6le%14.6le%14.6le%14.6le\n",
+    i,qme[i]*pars->stdeve,mme0[i],mme[i],mme0[i]+mme[i]-avg, qme[i], (mme0[i]+mme[i]-avg)/stv);
+
+  genome->fitness = sqrt(1);
+
+  printf("# Fitness at t=0: %lf\n", genome->fitness);
+  printf("# saved QM vs GMX energies in %s\n", filename);
+
+  for(i=0;i<top->n_atoms*pars->n_mol;i++) free(nbidx[i]);
+  free(nbidx);
+
+  return(0);
+}
+
+/* shift and scale energies, calculate fitness
+  sumde=0.0;
+  for(i=0;i<pars->n_qme;i++) {
+    normalized_e = (mme - avge)/pars->stdeve;
+    sumde += w_qme[i] * fabs(normalized_e - qme[i]);
+  }
+        not here ... as not mutations have occured yet ...
+        if(top->sgrpidx[inb]!=0 && strstr(pars->opt,dovdw)!=NULL) sig=genome->codon[limits->codonidx[top->sgrpidx[inb]]];
+        if(top->egrpidx[inb]!=0 && strstr(pars->opt,dovdw)!=NULL) eps=genome->codon[limits->codonidx[top->egrpidx[inb]]];
+*/

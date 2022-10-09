@@ -1,0 +1,15 @@
+$md
+   temp  = 300.0  # in K
+   time  = 500.0  # in ps
+   dump  =  50.0  # in fs
+   step  =   1.0  # in fs
+   velo  = false
+   nvt   =  true
+   hmass = 4
+   shake = 1
+   sccacc = 2.0
+$end
+$wall
+   potential=logfermi
+   sphere: auto, all
+$end
