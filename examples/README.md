@@ -38,7 +38,7 @@ Which (if you use ORCA) gives you energies and forces on each atom as a file in 
 5. Convert the output of the DFT calculations to a format that fogal can read. Here we use simple awk scripts that can process engrad files as output by ORCA. For other DFT or ab-initio program output you need to adjust the script accordingly (or write you own).
 
 ```
-./engrad2fogal.awk orca-00000.engrad
+./engrad2fogal.awk orca-*.engrad
 mv structures structures-dps.xyz
 cat energies forces > efw-dps
 ```
