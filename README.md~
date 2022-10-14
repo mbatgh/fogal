@@ -2,27 +2,26 @@
 # fogal
 
 The code provided here can be used to optimize Force field (FF) parameters for small organic molecules
-by fitting them to reproduce energies and forces from quantum mechanics (QM), i.e., ab-initio or DFT, calculations.
+by fitting them to reproduce energies and forces from ab-initio or DFT calculations.
 The resulting FF can be used in Molecular Dynamics simulations. If the input (initial parameters)
-are taken from the general Amber force field (GAFF), and the partial charges are generated accordingly (AM1BCC or RESP), 
-we expect the resulting FF to be compatible with the Amber family of protein/peptide FFs.
+are taken from GAFF, and the partial charges are generated accordingly (AM1BCC or RESP), we expect
+the resulting FF to be compatible with the Amber family of protein/peptide FFs.
 The input  includes, for a given molecule: a topology file with initial values for all parameters, 
-a file with the coordinates of a series of conformers, and a file that lists the QM based energies and/or forces 
+a file with coordinates of a series of conformers, and a file that lists energies and/or forces 
 corresponding to each conformer. The output is another topology file with optimized force field 
-parameters, and a table comparing the QM based energies and forces to those obtained with the initial vs the 
-optimized FF parameters.
+parameters, and a table comparing energies and forces obtained with the initial vs the optimized
+FF parameters.
 
 ## Features
 
 - Optimization is done using a genetic algorithm, and all the relevant hyper parameters can be adjusted by the user.
-- The optimized energy function is the one used in the popular GAFF FF.
-- Optimized parameters include: force constants of bond-angle, dihedral, and improper potentials, equilibrium
-  bond angles, and/or Lennard-Jones (LJ) paramters (epsilon/sigma).
-- Input conformers can be a set of single molecules, dimers, trimes, etc (using small clusters, rather than single molecule 
-  conformers is recommended when optimizig LJ parameters)
+- The optimized energy function, and corresponding parameters, are those used in the popular GAFF FF.
+- Optimized parameters include: force constants bond-angle, and dihedral force constants, equilibrium
+  bond angles, and/or Lennard-Jones paramters epsilon/sigma.
+- Input conformers can be a set of single molecules, dimers, trimes, etc.
 - Both energies and/or forces can be used for parameter fitting.
 - All energy/force values can be assigned individual weights.
-- In/output are in Gromacs topology file and simple text/csv formats.
+- In/output in Gromacs topology file format.
 
 ## Prerequisites
 
@@ -109,7 +108,7 @@ example provided [here](examples/README.md)
 ## Contact
 
 Please send any questions/bug-reports/suggestions to me. My full name is rare enough, so that,
-together with the place where I live (Graz), google will promptly provide you with my email address.
+together with the place where I live (Graz) google will promptly provide you with my email address.
 
 ## Reference
 
